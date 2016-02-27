@@ -24,7 +24,7 @@ impl fmt::Display for Error {
 
 #[derive(Debug, RustcEncodable, RustcDecodable)]
 pub struct Metadata {
-    versions: Vec<String>,
+    pub versions: Vec<String>,
 }
 
 fn format_error<E>(err: E) -> Error
