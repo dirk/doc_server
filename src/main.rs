@@ -5,19 +5,25 @@ use hyper::client::Client;
 use uuid::Uuid;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter};
-use std::process::{Command, Output};
+use std::ops::FnOnce;
+use std::process::{Command, ExitStatus, Output};
 
+#[derive(Debug)]
 enum TaskError {
     DownloadRequest,
     DownloadResponse,
-    CargoDoc,
+    CommandExecute(io::Error),
+    Command(ExitStatus, String),
 }
 
 struct TempCrate {
+    name: String,
     /// Path to the expanded crate directory
     path: String,
     /// Path to the downloaded crate package file
     crate_path: String,
+    /// Path to the built doc tarball
+    doc_path: Option<String>,
 }
 
 impl TempCrate {
@@ -26,9 +32,19 @@ impl TempCrate {
         let path = format!("tmp/{}-{}", name, uuid.to_hyphenated_string());
 
         TempCrate {
+            name: name.to_owned(),
             path: path.clone(),
             crate_path: format!("{}.crate", &path),
+            doc_path: None,
         }
+    }
+
+    fn cleanup(&self) -> io::Result<Output> {
+        Command::new("rm")
+                .arg("-rf")
+                .arg(self.path.clone())
+                .arg(self.crate_path.clone())
+                .output()
     }
 }
 
@@ -77,35 +93,45 @@ impl<'a> ExpandTask<'a> {
         }
     }
 
-    fn run(&self) {
+    fn run(&self) -> Result<(), TaskError> {
         let crate_path = self.temp.crate_path.clone();
         let path = self.temp.path.clone();
 
-        let mkdirp = Command::new("mkdir")
-                             .arg("-p").arg(&path)
-                             .output()
-                             .unwrap();
+        let mkdirp = move || {
+            Command::new("mkdir")
+                    .arg("-p").arg(path)
+                    .output()
+        };
 
-        ExpandTask::assert_passed(mkdirp);
+        let path = self.temp.path.clone(); // Clone again for safety
+        let tar = move || {
+            Command::new("tar")
+                    .arg("xf").arg(crate_path)
+                    .arg("-C").arg(path)
+                    .arg("--strip-components").arg("1")
+                    .output()
+        };
 
-        let tar = Command::new("tar")
-                          .arg("xf").arg(crate_path)
-                          .arg("-C").arg(path)
-                          .arg("--strip-components").arg("1")
-                          .output()
-                          .unwrap();
-
-        ExpandTask::assert_passed(tar);
+        run_command(mkdirp)
+            .and_then(|_| run_command(tar))
     }
+}
 
-    fn assert_passed(output: Output) {
-        if output.status.success() { return }
+fn run_command<F>(command: F) -> Result<(), TaskError>
+    where F: FnOnce() -> io::Result<Output> {
+    let output = command();
 
-        println!("status: {}", output.status);
-        println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
-        println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
-        panic!("Command failed");
-    }
+    output
+        .map_err(|err| TaskError::CommandExecute(err))
+        .and_then(|output| {
+            if output.status.success() {
+                Ok(())
+            } else {
+                let status = output.status;
+                let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+                Err(TaskError::Command(status, stderr))
+            }
+        })
 }
 
 struct DocTask<'a> {
@@ -119,30 +145,56 @@ impl<'a> DocTask<'a> {
         }
     }
 
-    fn run(&self) -> Result<(), TaskError> {
+    fn run(&self) -> Result<String, TaskError> {
         let path = self.temp.path.clone();
 
-        let doc = Command::new("cargo")
-                          .arg("doc")
-                          .current_dir(&path)
-                          .spawn()
-                          .and_then(|mut c| c.wait());
+        let command = format!("docker run -it --rm -v \"$(pwd)/{}:/source\" doc_server:build /home/build-doc.sh", &path);
 
-        match doc {
-            Ok(_) => Ok(()),
-            Err(_) => Err(TaskError::CargoDoc),
-        }
+        let doc = || {
+            Command::new("/bin/sh")
+                    .arg("-c")
+                    .arg(command)
+                    .spawn()
+                    .and_then(|c| c.wait_with_output())
+        };
+
+        let tarball_path = format!("{}/doc.tar", path);
+        let doc_path = &format!("tmp/doc-{}.tar", self.temp.name);
+
+        let move_tarball = move || {
+            Command::new("mv")
+                    .arg(tarball_path)
+                    .arg(doc_path)
+                    .output()
+        };
+
+        run_command(doc)
+            .and_then(|_| run_command(move_tarball))
+            .and_then(|_| Ok(doc_path.clone()))
     }
 }
 
 fn main() {
-    let temp = TempCrate::with_crate_name("metrics_distributor-0.2.1");
+    let mut temp = TempCrate::with_crate_name("metrics_distributor-0.2.1");
 
-    let download = DownloadTask::new(&temp);
-    let expand   = ExpandTask::new(&temp);
-    let doc      = DocTask::new(&temp);
+    let result = {
+        let download = DownloadTask::new(&temp);
+        let expand   = ExpandTask::new(&temp);
+        let doc      = DocTask::new(&temp);
 
-    download.run();
-    expand.run();
-    doc.run();
+        download.run()
+            .and_then(|_| expand.run())
+            .and_then(|_| doc.run())
+    };
+
+    temp.cleanup().unwrap();
+
+    match result {
+        Ok(doc_path) => {
+            temp.doc_path = Some(doc_path);
+        },
+        Err(err) => {
+            panic!("Error building documentation: {:?}", err);
+        },
+    }
 }
