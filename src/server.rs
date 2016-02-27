@@ -1,55 +1,64 @@
 extern crate hyper;
 extern crate iron;
-extern crate uuid;
+extern crate persistent;
+extern crate plugin;
+extern crate redis;
 extern crate router;
 extern crate route_recognizer;
 extern crate rustc_serialize;
+extern crate uuid;
 
 use hyper::method::Method;
 use iron::prelude::*;
+use iron::status;
+use persistent::Write;
 use router::Router;
-use route_recognizer::Params;
+use rustc_serialize::json;
 
 pub mod cratesio;
+mod db;
 mod tasks;
 mod temp_crate;
 mod util;
+mod web;
 
 pub use self::temp_crate::TempCrate;
 use cratesio::Client;
-use rustc_serialize::json;
-
-trait GetRouter {
-    fn get_router(&mut self) -> &Params;
-}
-
-impl<'a, 'b> GetRouter for Request<'a, 'b> {
-    fn get_router<'c>(&'c mut self) -> &'c Params {
-        self.extensions.get::<Router>().unwrap()
-    }
-}
+use db::{Db, GetDb};
+use web::GetRouter;
 
 fn get_crate(request: &mut Request) -> IronResult<Response> {
     let ref name = request.get_router().find("name").unwrap();
 
-    let metadata = Client::new().get_crate(name);
+    let metadata = {
+        let db = request.get_db().lock().unwrap();
+
+        db.get_crate(name.clone(), || {
+            Client::new().get_crate(name)
+        }, Some(300))
+    };
 
     match metadata {
         Ok(metadata) => {
             Ok(Response::with((
-                iron::status::Ok,
+                status::Ok,
                 json::encode(&metadata).unwrap()
             )))
         },
         Err(_) => {
-            Ok(Response::with((iron::status::NotFound)))
+            Ok(Response::with((status::NotFound)))
         },
     }
 }
 
 fn main() {
+    let db = Db::new("redis://127.0.0.1/");
+
     let mut router = Router::new();
     router.route(Method::Get, "/api/v1/crates/:name", get_crate);
 
-    Iron::new(router).http("localhost:3000").unwrap();
+    let mut chain = Chain::new(router);
+    chain.link_before(Write::<Db>::one(db));
+
+    Iron::new(chain).http("localhost:3000").unwrap();
 }

@@ -1,7 +1,7 @@
 use hyper::client::{Client as HyperClient};
-use hyper::error::{Error as HyperError};
 use rustc_serialize::json::Json;
 use std::error;
+use std::fmt;
 use std::io::BufReader;
 
 pub struct Client {
@@ -11,7 +11,18 @@ pub struct Client {
 #[derive(Debug)]
 pub struct Error(String);
 
-#[derive(Debug, RustcEncodable)]
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        &self.0
+    }
+}
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Debug, RustcEncodable, RustcDecodable)]
 pub struct Metadata {
     versions: Vec<String>,
 }
