@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io;
 use std::ops::FnOnce;
 use std::process::Output;
