@@ -2,31 +2,15 @@ extern crate hyper;
 extern crate uuid;
 
 use uuid::Uuid;
-use std::io;
 use std::process::{Command, ExitStatus, Output};
 
 mod tasks;
+mod temp_crate;
 mod util;
 
 use self::tasks::*;
 
-#[derive(Debug)]
-pub enum TaskError {
-    DownloadRequest,
-    DownloadResponse,
-    CommandExecute(io::Error),
-    Command(ExitStatus, String),
-}
-
-pub struct TempCrate {
-    name: String,
-    /// Path to the expanded crate directory
-    path: String,
-    /// Path to the downloaded crate package file
-    crate_path: String,
-    /// Path to the built doc tarball
-    doc_path: Option<String>,
-}
+pub use self::temp_crate::TempCrate;
 
 impl TempCrate {
     fn with_crate_name(name: &str) -> TempCrate {

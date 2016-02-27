@@ -5,4 +5,12 @@ authors = ["Dirk Gadsden <dirk@esherido.com>"]
 
 [dependencies]
 hyper = "0.7.2"
+iron = "0.2.6"
+router = "0.1.0"
+route-recognizer = "0.1.11"
+rustc-serialize = "0.3.18"
 uuid = "0.1.18"
+
+[[bin]]
+name = "web"
+path = "src/web.rs"

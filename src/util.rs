@@ -2,7 +2,7 @@ use std::io;
 use std::ops::FnOnce;
 use std::process::Output;
 
-use super::TaskError;
+use super::tasks::TaskError;
 
 pub fn run_command<F>(command: F) -> Result<(), TaskError>
     where F: FnOnce() -> io::Result<Output> {

@@ -2,7 +2,8 @@ use hyper::client::Client;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter};
 
-use super::super::{TaskError, TempCrate};
+use super::TaskError;
+use super::super::TempCrate;
 
 pub struct DownloadTask<'a> {
     temp: &'a TempCrate,

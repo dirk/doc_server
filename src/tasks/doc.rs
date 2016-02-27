@@ -1,6 +1,7 @@
 use std::process::Command;
 
-use super::super::{TaskError, TempCrate};
+use super::TaskError;
+use super::super::TempCrate;
 use super::super::util::run_command;
 
 pub struct DocTask<'a> {
