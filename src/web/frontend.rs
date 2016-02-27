@@ -1,8 +1,8 @@
 use iron::prelude::*;
 use iron::status;
-use rustc_serialize::json;
+use std::sync::RwLock;
 
-use super::super::cratesio::Client;
+use super::super::builder::Builder;
 use super::super::db::GetDb;
 use super::super::store::GetStore;
 use super::super::web::GetRouter;
@@ -25,6 +25,21 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     }
 
     let krate = store.make_crate(name, version);
+
+    let downloaded = store.contains(&krate);
+    let downloading = false;
+
+    if !downloaded && !downloading {
+        let db = request.get_db().clone();
+        let builder = Builder::new(name, version, db, krate.0.clone());
+
+        Builder::spawn(RwLock::new(builder));
+
+        return Ok(Response::with((
+            status::Ok,
+            format!("Building {} version {}...", name, version)
+        )))
+    }
 
     Ok(Response::with((
         status::Ok,

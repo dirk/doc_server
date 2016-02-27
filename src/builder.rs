@@ -1,7 +1,6 @@
 use std::io::{self, Write};
 use std::process::Command;
-use std::sync::RwLock;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
 use super::temp_crate::TempCrate;
@@ -20,10 +19,10 @@ enum Status {
 }
 
 /// Handles compiling a crate's documentation.
-struct Builder {
+pub struct Builder {
     temp_crate: TempCrate,
     db: Arc<Mutex<Db>>,
-    status: Status,
+    status: RwLock<Status>,
     /// Destination path where the tarball will end up
     dest_path: String,
 }
@@ -31,12 +30,12 @@ struct Builder {
 impl Builder {
     // dest_dir: Destination directory in which the tarball should be placed
     //           after downloading
-    fn new(name: &str, version: &str, db: Arc<Mutex<Db>>, dest_path: &str) -> Builder {
+    pub fn new(name: &str, version: &str, db: Arc<Mutex<Db>>, dest_path: String) -> Builder {
         Builder {
             temp_crate: TempCrate::new(name, version),
             db: db,
-            status: Status::Pending,
-            dest_path: dest_path.to_owned(),
+            status: RwLock::new(Status::Pending),
+            dest_path: dest_path.clone(),
         }
     }
 
@@ -44,19 +43,25 @@ impl Builder {
     // The builder must be wrapped in an `RwLock`. The thread will acquire
     // a write lock on it, but other threads can still read it to inspect
     // its status.
-    fn spawn(lock: RwLock<Builder>) {
+    pub fn spawn(lock: RwLock<Builder>) {
         thread::spawn(move || {
             let mut builder = lock.write().unwrap();
             builder.run();
         });
     }
 
-    fn run(&mut self) -> Status {
-        self.status = Status::Running;
+    fn update_status(&self, new_status: Status) {
+        let mut status = self.status.write().unwrap();
+        *status = new_status;
+    }
 
-        let download = DownloadTask::new(&self.temp_crate);
-        let expand   = ExpandTask::new(&self.temp_crate);
-        let doc      = DocTask::new(&self.temp_crate);
+    fn run(&mut self) -> Status {
+        let temp_crate = &self.temp_crate;
+        self.update_status(Status::Running);
+
+        let download = DownloadTask::new(temp_crate);
+        let expand   = ExpandTask::new(temp_crate);
+        let doc      = DocTask::new(temp_crate);
 
         let result = download.run()
             .and_then(|_| expand.run())
@@ -74,12 +79,12 @@ impl Builder {
             });
 
         if let Err(err) = result {
-            self.status = Status::Failed(format!("{:?}", err));
+            self.update_status(Status::Failed(format!("{:?}", err)));
             let _ = write!(io::stderr(), "Error building documentation: {:?}", err);
         } else {
-            self.status = Status::Succeeded(self.dest_path.clone());
+            self.update_status(Status::Succeeded(self.dest_path.clone()));
         }
 
-        self.status.clone()
+        self.status.read().unwrap().clone()
     }
 }

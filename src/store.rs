@@ -2,6 +2,7 @@ use iron::prelude::Request;
 use iron::typemap;
 use persistent::Read;
 use plugin::Extensible;
+use std::path::Path;
 use std::sync::Arc;
 
 pub struct Store {
@@ -18,8 +19,9 @@ impl Store {
         }
     }
 
-    pub fn contains(&self, krate: StoredCrate) -> bool {
-        false
+    pub fn contains(&self, krate: &StoredCrate) -> bool {
+        let path = Path::new(&krate.0);
+        path.exists()
     }
 
     pub fn make_crate(&self, name: &str, version: &str) -> StoredCrate {
