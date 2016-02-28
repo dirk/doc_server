@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use super::TaskError;
 use super::super::TempCrate;
@@ -24,6 +24,8 @@ impl<'a> DocTask<'a> {
             Command::new("/bin/sh")
                     .arg("-c")
                     .arg(command)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
                     .spawn()
                     .and_then(|c| c.wait_with_output())
         };

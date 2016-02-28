@@ -24,6 +24,10 @@ impl TempCrate {
         }
     }
 
+    pub fn pair(&self) -> String {
+        format!("{}-{}", self.name, self.version)
+    }
+
     pub fn cleanup(&self) -> io::Result<Output> {
         Command::new("rm")
                 .arg("-rf")

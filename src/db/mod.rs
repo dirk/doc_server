@@ -1,5 +1,5 @@
 use iron::typemap;
-use redis::{self, Commands};
+use redis::{self, Commands, RedisError};
 use rustc_serialize::json;
 use rustc_serialize::{Encodable, Decodable};
 use std::collections::HashMap;
@@ -20,6 +20,13 @@ pub struct Db {
     builds_in_progress: HashMap<StoredCrate, Arc<RwLock<Builder>>>,
 }
 
+/// Represents a failed crate documentation build
+#[derive(Debug, RustcEncodable, RustcDecodable)]
+pub struct FailedModel {
+    pub code: i32,
+    pub message: String,
+}
+
 impl typemap::Key for Db { type Value = Db; }
 
 impl Db {
@@ -31,6 +38,28 @@ impl Db {
             redis_con: con,
             builds_in_progress: HashMap::new(),
         }
+    }
+
+    // krate: Name-version pair
+    pub fn set_failed(&self, krate: &str, failed: FailedModel) -> Result<(), Error> {
+        let key = format!("failed:{}", krate);
+        let data = json::encode(&failed).unwrap();
+
+        let result = self.redis_con.set(key.clone(), data)
+            .map_err(|err| Error(format!("{}", err)));
+
+        let _: Result<(), RedisError> = self.redis_con.expire(key, 60 * 60 * 24); // Expire after a day
+
+        result
+    }
+
+    pub fn get_failed(&self, krate: &str) -> Option<FailedModel> {
+        let key = format!("failed:{}", krate);
+        let result: Option<String> = self.redis_con.get(key).unwrap();
+
+        result.map(|data| {
+            json::decode::<FailedModel>(&data).unwrap()
+        })
     }
 
     // expire_in: Also set time-to-live in second

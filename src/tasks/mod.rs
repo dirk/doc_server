@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::io;
 use std::process::ExitStatus;
 
 mod doc;
@@ -11,10 +10,10 @@ pub use self::download::DownloadTask;
 pub use self::expand::ExpandTask;
 pub use self::doc::DocTask;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TaskError {
     DownloadRequest,
     DownloadResponse,
-    CommandExecute(io::Error),
-    Command(ExitStatus, String),
+    CommandExecute(String),
+    Command(ExitStatus, String, String),
 }

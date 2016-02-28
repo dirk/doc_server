@@ -9,7 +9,7 @@ pub struct Client {
 }
 
 #[derive(Debug)]
-pub struct Error(String);
+pub struct Error(pub String);
 
 impl error::Error for Error {
     fn description(&self) -> &str {

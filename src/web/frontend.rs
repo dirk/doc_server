@@ -27,6 +27,15 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
         return Ok(Response::with((status::NotFound)))
     }
 
+    let pair = format!("{}-{}", name.clone(), version.clone());
+    let failed = { db.lock().unwrap().get_failed(&pair) };
+    if let Some(failed) = failed {
+        return Ok(Response::with((
+            status::Ok,
+            format!("Unable to build {}:\n\n{}", pair, failed.message)
+        )))
+    }
+
     let krate = store.make_crate(name, version);
 
     let downloaded  = store.contains(&krate);
@@ -88,6 +97,7 @@ pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
         )))
     }
 
+    // Check if we can serve an "index.html"
     let index_path_buf = path_buf.join(Path::new("index.html"));
     if index_path_buf.is_file() {
         let mut index_url = request.url.clone();

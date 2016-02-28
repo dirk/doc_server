@@ -3,7 +3,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-use super::db::Db;
+use super::db::{Db, FailedModel};
 use super::store::StoredCrate;
 use super::tasks::*;
 use super::temp_crate::TempCrate;
@@ -16,7 +16,7 @@ pub enum Status {
     /// Succeeded with path to a doc tarball
     Succeeded(String),
     // Failed with a string describing what went wrong
-    Failed(String),
+    Failed(TaskError),
 }
 
 /// Handles compiling a crate's documentation.
@@ -51,14 +51,43 @@ impl Builder {
         let builder = builder.clone();
 
         thread::spawn(move || {
-            {
+            let status = {
                 let mut writeable_builder = builder.write().unwrap();
-                writeable_builder.run();
+                writeable_builder.run()
+            };
+
+            let mut writeable_db = db.lock().unwrap();
+
+            if let Status::Failed(err) = status {
+                let code: i32;
+                let message: String;
+
+                match err {
+                    TaskError::Command(status, stdout, stderr) => {
+                        code = status.code().unwrap_or(-1);
+                        message = format!("{}\n{}", stdout, stderr).trim().to_owned();
+                    },
+                    _ => {
+                        code = -1;
+                        message = "Unknown reason".to_owned();
+                    }
+                }
+
+                // Model representing the error code and message
+                let failed = FailedModel {
+                    code: code,
+                    message: message,
+                };
+                // Name-version pair
+                let pair = {
+                    let readable_builder = builder.read().unwrap();
+                    readable_builder.temp_crate.pair()
+                };
+
+                let _ = writeable_db.set_failed(&pair, failed);
             }
 
-
             // Remove the builder from the list in-progrss builds
-            let mut writeable_db = db.lock().unwrap();
             writeable_db.remove_build_in_progress(builder.clone());
         });
     }
@@ -94,8 +123,8 @@ impl Builder {
         self.temp_crate.cleanup().unwrap(); // Always cleanup!
 
         if let Err(err) = result {
-            let _ = write!(io::stderr(), "Error building documentation: {:?}", err);
-            self.update_status(Status::Failed(format!("{:?}", err)))
+            let _ = write!(io::stderr(), "Error building documentation: {:?}\n", err);
+            self.update_status(Status::Failed(err))
         } else {
             let dest_path = self.dest.0.clone();
             self.update_status(Status::Succeeded(dest_path))
