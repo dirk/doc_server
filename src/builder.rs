@@ -81,16 +81,17 @@ impl Builder {
             .and_then(|_| expand.run())
             .and_then(|_| doc.run())
             .and_then(|doc_path| {
-                self.temp_crate.cleanup().unwrap();
-
                 let dest_path = self.dest.0.clone();
+
                 run_command(move || {
                     Command::new("mv")
-                            .arg(doc_path)
+                            .arg(format!("{}/", doc_path))
                             .arg(dest_path)
                             .output()
                 })
             });
+
+        self.temp_crate.cleanup().unwrap(); // Always cleanup!
 
         if let Err(err) = result {
             let _ = write!(io::stderr(), "Error building documentation: {:?}", err);

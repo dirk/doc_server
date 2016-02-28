@@ -1,11 +1,8 @@
 use iron::prelude::*;
-use iron::{headers, status};
-use mime_guess;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
+use iron::modifiers::Redirect;
+use iron::status;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use tar::{self, Archive};
 
 use super::super::builder::Builder;
 use super::super::db::GetDb;
@@ -72,7 +69,7 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
 pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
     let ref name = request.get_router().find("name").unwrap().to_owned();
     let ref version = request.get_router().find("version").unwrap().to_owned();
-    let ref requested_path = request.get_router().find("path").unwrap().to_owned();
+    let ref requested_path = sanitize_requested_path(request.get_router().find("path").unwrap());
     let store = request.get_store();
 
     let krate = store.make_crate(name, version);
@@ -81,33 +78,29 @@ pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
         return Ok(Response::with((status::NotFound)))
     }
 
-    let file = File::open(krate.0.clone()).unwrap();
-    let archive = Archive::new(file);
-    let entries = archive.entries().unwrap();
+    let mut path_buf = PathBuf::from(krate.0);
+    path_buf.extend(Path::new(requested_path));
 
-    for file in entries {
-        let file = file.unwrap(); // Ensure there wasn't an I/O error
-        let path = get_relative_file_path(&file);
+    if path_buf.is_file() {
+        return Ok(Response::with((
+            status::Ok,
+            path_buf.as_path()
+        )))
+    }
 
-        let mime_type = Path::new(&path).extension()
-            .map(|e| mime_guess::get_mime_type(e.to_str().unwrap()));
-
-        if path == requested_path.clone() {
-            let mut buffer: Vec<u8> = vec![];
-            let mut reader = BufReader::new(file);
-            reader.read_to_end(&mut buffer).unwrap();
-
-            let mut response = Response::with((
-                status::Ok,
-                buffer
-            ));
-
-            if let Some(m) = mime_type {
-                response.headers.set(headers::ContentType(m))
-            }
-
-            return Ok(response)
+    let index_path_buf = path_buf.join(Path::new("index.html"));
+    if index_path_buf.is_file() {
+        let mut index_url = request.url.clone();
+        // Remove a trailing slash if found
+        if index_url.path.last().unwrap() == "" {
+            index_url.path.pop();
         }
+        index_url.path.push("index.html".to_owned());
+
+        return Ok(Response::with((
+            status::Found,
+            Redirect(index_url)
+        )))
     }
 
     Ok(Response::with((
@@ -116,12 +109,12 @@ pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
     )))
 }
 
-fn get_relative_file_path(file: &tar::Entry<File>) -> String {
-    let path_buf = file.header().path().unwrap().into_owned();
+fn sanitize_requested_path(path: &str) -> String {
+    let mut path = path;
 
-    let mut path = path_buf.to_str().unwrap();
-    if path.starts_with("./") {
-        path = &path[2..];
+    // Strip off a trailing slash
+    if path.ends_with("/") {
+        path = &path[..path.len()-1];
     }
 
     path.to_owned()

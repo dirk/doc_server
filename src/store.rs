@@ -10,7 +10,7 @@ pub struct Store {
     path: String,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct StoredCrate(pub String);
 
 impl Store {
@@ -26,7 +26,7 @@ impl Store {
     }
 
     pub fn make_crate(&self, name: &str, version: &str) -> StoredCrate {
-        StoredCrate(format!("{}/{}-{}.tar", self.path, name, version))
+        StoredCrate(format!("{}/{}-{}", self.path, name, version))
     }
 }
 

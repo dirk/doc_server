@@ -28,18 +28,9 @@ impl<'a> DocTask<'a> {
                     .and_then(|c| c.wait_with_output())
         };
 
-        let tarball_path = format!("{}/doc.tar", path);
-        let doc_path = &format!("tmp/doc-{}.tar", self.temp.name);
-
-        let move_tarball = move || {
-            Command::new("mv")
-                    .arg(tarball_path)
-                    .arg(doc_path)
-                    .output()
-        };
+        let doc_path = &format!("{}/target/doc", self.temp.path);
 
         run_command(doc)
-            .and_then(|_| run_command(move_tarball))
             .and_then(|_| Ok(doc_path.clone()))
     }
 }

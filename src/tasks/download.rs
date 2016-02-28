@@ -19,11 +19,11 @@ impl<'a> DownloadTask<'a> {
     pub fn run(&self) -> Result<(), TaskError> {
         let client = Client::new();
 
-        let dl_url = "https://crates-io.s3-us-west-1.amazonaws.com/crates/metrics_distributor/metrics_distributor-0.2.1.crate";
+        let dl_url = format!("https://crates-io.s3-us-west-1.amazonaws.com/crates/{}/{}-{}.crate", self.temp.name, self.temp.name, self.temp.version);
         let crate_path = self.temp.crate_path.clone();
 
         let dl_response = try! {
-            client.get(dl_url).send()
+            client.get(&dl_url).send()
                 .map_err(|_| TaskError::DownloadRequest)
         };
 

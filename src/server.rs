@@ -1,12 +1,12 @@
 extern crate hyper;
 extern crate iron;
-extern crate mime_guess;
 extern crate persistent;
 extern crate plugin;
 extern crate redis;
 extern crate router;
 extern crate route_recognizer;
 extern crate rustc_serialize;
+extern crate staticfile;
 extern crate uuid;
 extern crate tar;
 
