@@ -11,13 +11,11 @@ use super::super::web::GetRouter;
 use super::util;
 
 pub fn get_docs(request: &mut Request) -> IronResult<Response> {
-    let ref name = request.get_router().find("name").unwrap().to_owned();
-    let ref version = request.get_router().find("version").unwrap().to_owned();
-
+    let (name, version) = get_name_and_version(request);
     let db = request.get_db().clone();
     let store = request.get_store();
 
-    let metadata = util::get_crate(request.get_db(), name);
+    let metadata = util::get_crate(request.get_db(), &name);
 
     if let Err(_) = metadata {
         return Ok(Response::with((status::NotFound)))
@@ -36,7 +34,7 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
         )))
     }
 
-    let krate = store.make_crate(name, version);
+    let krate = store.make_crate(&name, &version);
 
     let downloaded  = store.contains(&krate);
     let downloading = { db.lock().unwrap().is_build_in_progress(&krate) };
@@ -44,7 +42,7 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     match (downloaded, downloading) {
         // Not downloaded or downloading, so start a new download and build
         (false, false) => {
-            let builder = Builder::new(name, version, krate.clone());
+            let builder = Builder::new(&name, &version, krate.clone());
 
             Builder::spawn(db, Arc::new(RwLock::new(builder)));
 
@@ -62,10 +60,11 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
         },
         // Downloaded
         (true, false) => {
-            Ok(Response::with((
-                status::Ok,
-                krate.0
-            )))
+            let mut url = request.url.clone();
+            url.path.push(name.clone());
+            url.path.push("index.html".to_owned());
+
+            return Ok(Response::with((status::Found, Redirect(url))))
         },
         _ => {
             panic!("Unreachable state: downloaded = {:?}, downloading = {:?}",
@@ -76,12 +75,11 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
 }
 
 pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
-    let ref name = request.get_router().find("name").unwrap().to_owned();
-    let ref version = request.get_router().find("version").unwrap().to_owned();
+    let (name, version) = get_name_and_version(request);
     let ref requested_path = sanitize_requested_path(request.get_router().find("path").unwrap());
     let store = request.get_store();
 
-    let krate = store.make_crate(name, version);
+    let krate = store.make_crate(&name, &version);
 
     if !store.contains(&krate) {
         return Ok(Response::with((status::NotFound)))
@@ -117,6 +115,13 @@ pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
         status::NotFound,
         format!("Path {} not found in crate documentation", requested_path)
     )))
+}
+
+fn get_name_and_version(request: &Request) -> (String, String) {
+    let ref name = request.get_router().find("name").unwrap().to_owned();
+    let ref version = request.get_router().find("version").unwrap().to_owned();
+
+    (name.clone(), version.clone())
 }
 
 fn sanitize_requested_path(path: &str) -> String {
