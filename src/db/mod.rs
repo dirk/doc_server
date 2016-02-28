@@ -2,9 +2,13 @@ use iron::typemap;
 use redis::{self, Commands};
 use rustc_serialize::json;
 use rustc_serialize::{Encodable, Decodable};
+use std::collections::HashMap;
 use std::error;
+use std::sync::{Arc, RwLock};
 
+use super::builder::Builder;
 use super::cratesio::{Error, Metadata};
+use super::store::StoredCrate;
 
 pub mod util;
 
@@ -12,6 +16,8 @@ pub use self::util::GetDb;
 
 pub struct Db {
     redis_con: redis::Connection,
+
+    builds_in_progress: HashMap<StoredCrate, Arc<RwLock<Builder>>>,
 }
 
 impl typemap::Key for Db { type Value = Db; }
@@ -23,6 +29,7 @@ impl Db {
 
         Db {
             redis_con: con,
+            builds_in_progress: HashMap::new(),
         }
     }
 
@@ -43,6 +50,22 @@ impl Db {
         }
 
         metadata
+    }
+
+    pub fn add_build_in_progress(&mut self, builder: Arc<RwLock<Builder>>) {
+        let dest = builder.read().unwrap().dest.clone();
+
+        self.builds_in_progress.insert(dest, builder);
+    }
+
+    pub fn remove_build_in_progress(&mut self, builder: Arc<RwLock<Builder>>) {
+        let ref dest = builder.read().unwrap().dest;
+
+        self.builds_in_progress.remove(dest);
+    }
+
+    pub fn is_build_in_progress(&self, krate: &StoredCrate) -> bool {
+        self.builds_in_progress.contains_key(krate)
     }
 
     fn fetch<F, T, E>(&self, key: String, fetch: F) -> Result<T, E>

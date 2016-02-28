@@ -1,6 +1,6 @@
 use iron::prelude::*;
 use iron::status;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use super::super::builder::Builder;
 use super::super::db::GetDb;
@@ -11,6 +11,8 @@ use super::util;
 pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     let ref name = request.get_router().find("name").unwrap().to_owned();
     let ref version = request.get_router().find("version").unwrap().to_owned();
+
+    let db = request.get_db().clone();
     let store = request.get_store();
 
     let metadata = util::get_crate(request.get_db(), name);
@@ -18,31 +20,46 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     if let Err(_) = metadata {
         return Ok(Response::with((status::NotFound)))
     }
-    let metadata = metadata.unwrap();
 
-    if !metadata.versions.contains(&version.to_owned()) {
+    if !metadata.unwrap().versions.contains(&version.to_owned()) {
         return Ok(Response::with((status::NotFound)))
     }
 
     let krate = store.make_crate(name, version);
 
-    let downloaded = store.contains(&krate);
-    let downloading = false;
+    let downloaded  = store.contains(&krate);
+    let downloading = { db.lock().unwrap().is_build_in_progress(&krate) };
 
-    if !downloaded && !downloading {
-        let db = request.get_db().clone();
-        let builder = Builder::new(name, version, db, krate.0.clone());
+    match (downloaded, downloading) {
+        // Not downloaded or downloading, so start a new download and build
+        (false, false) => {
+            let builder = Builder::new(name, version, krate.clone());
 
-        Builder::spawn(RwLock::new(builder));
+            Builder::spawn(db, Arc::new(RwLock::new(builder)));
 
-        return Ok(Response::with((
-            status::Ok,
-            format!("Building {} version {}...", name, version)
-        )))
+            Ok(Response::with((
+                status::Ok,
+                format!("Building {} version {}...", name, version)
+            )))
+        },
+        // Already downloading/building
+        (false, true) => {
+            Ok(Response::with((
+                status::Ok,
+                format!("Already building {} version {}...", name, version)
+            )))
+        },
+        // Downloaded
+        (true, false) => {
+            Ok(Response::with((
+                status::Ok,
+                krate.0
+            )))
+        },
+        _ => {
+            panic!("Unreachable state: downloaded = {:?}, downloading = {:?}",
+                   downloaded,
+                   downloading)
+        }
     }
-
-    Ok(Response::with((
-        status::Ok,
-        krate.0
-    )))
 }

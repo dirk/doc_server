@@ -10,6 +10,7 @@ pub struct Store {
     path: String,
 }
 
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct StoredCrate(pub String);
 
 impl Store {

@@ -3,13 +3,14 @@ use std::process::Command;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-use super::temp_crate::TempCrate;
 use super::db::Db;
+use super::store::StoredCrate;
 use super::tasks::*;
+use super::temp_crate::TempCrate;
 use super::util::run_command;
 
 #[derive(Clone)]
-enum Status {
+pub enum Status {
     Pending,
     Running,
     /// Succeeded with path to a doc tarball
@@ -20,22 +21,20 @@ enum Status {
 
 /// Handles compiling a crate's documentation.
 pub struct Builder {
-    temp_crate: TempCrate,
-    db: Arc<Mutex<Db>>,
-    status: RwLock<Status>,
+    pub temp_crate: TempCrate,
+    pub status: RwLock<Status>,
     /// Destination path where the tarball will end up
-    dest_path: String,
+    pub dest: StoredCrate,
 }
 
 impl Builder {
     // dest_dir: Destination directory in which the tarball should be placed
     //           after downloading
-    pub fn new(name: &str, version: &str, db: Arc<Mutex<Db>>, dest_path: String) -> Builder {
+    pub fn new(name: &str, version: &str, dest: StoredCrate) -> Builder {
         Builder {
             temp_crate: TempCrate::new(name, version),
-            db: db,
             status: RwLock::new(Status::Pending),
-            dest_path: dest_path.clone(),
+            dest: dest.clone(),
         }
     }
 
@@ -43,10 +42,21 @@ impl Builder {
     // The builder must be wrapped in an `RwLock`. The thread will acquire
     // a write lock on it, but other threads can still read it to inspect
     // its status.
-    pub fn spawn(lock: RwLock<Builder>) {
+    pub fn spawn(db: Arc<Mutex<Db>>, builder: Arc<RwLock<Builder>>) {
+        {
+            let mut writeable_db = db.lock().unwrap();
+            writeable_db.add_build_in_progress(builder.clone());
+        }
+
+        let builder = builder.clone();
+
         thread::spawn(move || {
-            let mut builder = lock.write().unwrap();
-            builder.run();
+            let mut writeable_builder = builder.write().unwrap();
+            writeable_builder.run();
+
+            // Remove the builder from the list in-progrss builds
+            let mut writeable_db = db.lock().unwrap();
+            writeable_db.remove_build_in_progress(builder.clone());
         });
     }
 
@@ -69,7 +79,7 @@ impl Builder {
             .and_then(|doc_path| {
                 self.temp_crate.cleanup().unwrap();
 
-                let dest_path = self.dest_path.clone();
+                let dest_path = self.dest.0.clone();
                 run_command(move || {
                     Command::new("mv")
                             .arg(doc_path)
@@ -82,7 +92,8 @@ impl Builder {
             self.update_status(Status::Failed(format!("{:?}", err)));
             let _ = write!(io::stderr(), "Error building documentation: {:?}", err);
         } else {
-            self.update_status(Status::Succeeded(self.dest_path.clone()));
+            let dest_path = self.dest.0.clone();
+            self.update_status(Status::Succeeded(dest_path));
         }
 
         self.status.read().unwrap().clone()
