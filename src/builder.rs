@@ -51,8 +51,11 @@ impl Builder {
         let builder = builder.clone();
 
         thread::spawn(move || {
-            let mut writeable_builder = builder.write().unwrap();
-            writeable_builder.run();
+            {
+                let mut writeable_builder = builder.write().unwrap();
+                writeable_builder.run();
+            }
+
 
             // Remove the builder from the list in-progrss builds
             let mut writeable_db = db.lock().unwrap();
@@ -60,9 +63,10 @@ impl Builder {
         });
     }
 
-    fn update_status(&self, new_status: Status) {
+    fn update_status(&self, new_status: Status) -> Status {
         let mut status = self.status.write().unwrap();
-        *status = new_status;
+        *status = new_status.clone();
+        new_status
     }
 
     fn run(&mut self) -> Status {
@@ -89,13 +93,11 @@ impl Builder {
             });
 
         if let Err(err) = result {
-            self.update_status(Status::Failed(format!("{:?}", err)));
             let _ = write!(io::stderr(), "Error building documentation: {:?}", err);
+            self.update_status(Status::Failed(format!("{:?}", err)))
         } else {
             let dest_path = self.dest.0.clone();
-            self.update_status(Status::Succeeded(dest_path));
+            self.update_status(Status::Succeeded(dest_path))
         }
-
-        self.status.read().unwrap().clone()
     }
 }

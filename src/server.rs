@@ -1,5 +1,6 @@
 extern crate hyper;
 extern crate iron;
+extern crate mime_guess;
 extern crate persistent;
 extern crate plugin;
 extern crate redis;
@@ -7,6 +8,7 @@ extern crate router;
 extern crate route_recognizer;
 extern crate rustc_serialize;
 extern crate uuid;
+extern crate tar;
 
 use hyper::method::Method;
 use iron::prelude::*;
@@ -39,6 +41,7 @@ fn main() {
     let mut router = Router::new();
     router.route(Method::Get, "/api/v1/crates/:name", api::get_crate);
     router.route(Method::Get, "/crates/:name/:version", frontend::get_docs);
+    router.route(Method::Get, "/crates/:name/:version/*path", frontend::get_doc_file);
 
     let mut chain = Chain::new(router);
     chain.link_before(Write::<Db>::one(db));
