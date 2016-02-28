@@ -1,37 +1,49 @@
 extern crate hyper;
+extern crate iron;
+extern crate persistent;
+extern crate plugin;
+extern crate redis;
+extern crate router;
+extern crate route_recognizer;
+extern crate rustc_serialize;
 extern crate uuid;
 
-use std::process::{Command, ExitStatus, Output};
+use hyper::method::Method;
+use iron::prelude::*;
+use persistent::{Read, Write};
+use router::Router;
+use std::env;
 
+pub mod cratesio;
+mod builder;
+mod db;
+mod store;
 mod tasks;
 mod temp_crate;
 mod util;
-
-use self::tasks::*;
+mod web;
 
 pub use self::temp_crate::TempCrate;
+use db::Db;
+use store::Store;
 
 fn main() {
-    let mut temp = TempCrate::with_crate_name("metrics_distributor-0.2.1");
+    use self::web::api;
+    use self::web::frontend;
 
-    let result = {
-        let download = DownloadTask::new(&temp);
-        let expand   = ExpandTask::new(&temp);
-        let doc      = DocTask::new(&temp);
+    let db = Db::new("redis://127.0.0.1/");
 
-        download.run()
-            .and_then(|_| expand.run())
-            .and_then(|_| doc.run())
-    };
+    let cwd = env::current_dir().unwrap();
+    let store = Store::new(format!("{}/docs", cwd.display()));
 
-    temp.cleanup().unwrap();
+    let mut router = Router::new();
+    router.route(Method::Get, "/api/v1/crates/:name", api::get_crate);
+    router.route(Method::Get, "/crates/:name/:version", frontend::get_docs);
+    router.route(Method::Get, "/crates/:name/:version/*path", frontend::get_doc_file);
 
-    match result {
-        Ok(doc_path) => {
-            temp.doc_path = Some(doc_path);
-        },
-        Err(err) => {
-            panic!("Error building documentation: {:?}", err);
-        },
-    }
+    let mut chain = Chain::new(router);
+    chain.link_before(Write::<Db>::one(db));
+    chain.link_before(Read::<Store>::one(store));
+
+    Iron::new(chain).http("localhost:3000").unwrap();
 }

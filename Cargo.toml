@@ -13,7 +13,3 @@ router = "0.1.0"
 route-recognizer = "0.1.11"
 rustc-serialize = "0.3.18"
 uuid = "0.1.18"
-
-[[bin]]
-name = "server"
-path = "src/server.rs"
