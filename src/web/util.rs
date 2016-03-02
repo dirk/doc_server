@@ -24,3 +24,10 @@ pub fn get_crate(db: &Arc<Mutex<Db>>, name: &str) -> Result<Metadata, Error> {
         Client::new().get_crate(name)
     }, Some(300))
 }
+
+pub fn get_name_and_version<'a>(request: &'a Request) -> (&'a str, &'a str) {
+    let name = request.get_router().find("name").unwrap();
+    let version = request.get_router().find("version").unwrap();
+
+    (name, version)
+}

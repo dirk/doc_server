@@ -8,7 +8,7 @@ use super::super::builder::Builder;
 use super::super::db::GetDb;
 use super::super::store::GetStore;
 use super::super::web::GetRouter;
-use super::util;
+use super::util::{self, get_name_and_version};
 
 pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     let (name, version) = get_name_and_version(request);
@@ -61,7 +61,7 @@ pub fn get_docs(request: &mut Request) -> IronResult<Response> {
         // Downloaded
         (true, false) => {
             let mut url = request.url.clone();
-            url.path.push(name.clone());
+            url.path.push(name.to_owned());
             url.path.push("index.html".to_owned());
 
             return Ok(Response::with((status::Found, Redirect(url))))
@@ -115,13 +115,6 @@ pub fn get_doc_file(request: &mut Request) -> IronResult<Response> {
         status::NotFound,
         format!("Path {} not found in crate documentation", requested_path)
     )))
-}
-
-fn get_name_and_version(request: &Request) -> (String, String) {
-    let ref name = request.get_router().find("name").unwrap().to_owned();
-    let ref version = request.get_router().find("version").unwrap().to_owned();
-
-    (name.clone(), version.clone())
 }
 
 fn sanitize_requested_path(path: &str) -> String {
