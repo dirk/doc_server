@@ -37,7 +37,10 @@ fn main() {
     let store = Store::new(format!("{}/docs", cwd.display()));
 
     let mut router = Router::new();
+
     router.route(Method::Get, "/api/v1/crates/:name", api::get_crate);
+    router.route(Method::Get, "/api/v1/crates/:name/:version/status", api::get_crate_status);
+
     router.route(Method::Get, "/crates/:name/:version", frontend::get_docs);
     router.route(Method::Get, "/crates/:name/:version/*path", frontend::get_doc_file);
 
