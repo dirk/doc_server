@@ -13,6 +13,12 @@ pub struct Store {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct StoredCrate(pub String);
 
+impl StoredCrate {
+    pub fn path<'a>(&'a self) -> &'a Path {
+        Path::new(&self.0)
+    }
+}
+
 impl Store {
     pub fn new(path: String) -> Store {
         Store {
@@ -26,7 +32,7 @@ impl Store {
     }
 
     pub fn make_crate(&self, name: &str, version: &str) -> StoredCrate {
-        StoredCrate(format!("{}/{}-{}", self.path, name, version))
+        StoredCrate(format!("{}/{}/{}", self.path, name, version))
     }
 }
 

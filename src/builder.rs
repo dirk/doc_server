@@ -110,14 +110,23 @@ impl Builder {
             .and_then(|_| expand.run())
             .and_then(|_| doc.run())
             .and_then(|doc_path| {
-                let dest_path = self.dest.0.clone();
+                let dest_path = self.dest.path();
 
-                run_command(move || {
-                    Command::new("mv")
+                let mkdirp = move || {
+                    Command::new("mkdir")
+                            .arg("-p").arg(dest_path)
+                            .output()
+                };
+                let mv = move || {
+                    Command::new("cp")
+                            .arg("-r")
                             .arg(format!("{}/", doc_path))
                             .arg(dest_path)
                             .output()
-                })
+                };
+
+                run_command(mkdirp)
+                    .and_then(|_| run_command(mv))
             });
 
         self.temp_crate.cleanup().unwrap(); // Always cleanup!
