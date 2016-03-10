@@ -1,18 +1,23 @@
 extern crate hyper;
 extern crate iron;
+extern crate mount;
 extern crate persistent;
 extern crate plugin;
 extern crate redis;
 extern crate router;
 extern crate route_recognizer;
 extern crate rustc_serialize;
+extern crate staticfile;
 extern crate uuid;
 
 use hyper::method::Method;
 use iron::prelude::*;
+use mount::Mount;
 use persistent::{Read, Write};
 use router::Router;
+use staticfile::Static;
 use std::env;
+use std::path::Path;
 
 pub mod cratesio;
 mod builder;
@@ -48,5 +53,9 @@ fn main() {
     chain.link_before(Write::<Db>::one(db));
     chain.link_before(Read::<Store>::one(store));
 
-    Iron::new(chain).http("localhost:3000").unwrap();
+    let mut mount = Mount::new();
+    mount.mount("/static/", Static::new(Path::new("public/")));
+    mount.mount("/", chain);
+
+    Iron::new(mount).http("localhost:3000").unwrap();
 }
