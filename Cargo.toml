@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["Dirk Gadsden <dirk@esherido.com>"]
 
 [dependencies]
+handlebars-iron = "0.12.0"
 hyper = "0.7.2"
 iron = "0.2.6"
+maplit = "0.1.3"
 mount = "0.0.10"
 persistent = "0.0.9"
 plugin = "0.2.6"

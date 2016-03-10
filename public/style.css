@@ -2,3 +2,8 @@
   margin: 0;
   padding: 0;
 }
+
+.main {
+  margin: 1rem;
+  font-size: 1.25rem;
+}

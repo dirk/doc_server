@@ -1,3 +1,4 @@
+use handlebars_iron::Template;
 use iron::prelude::*;
 use iron::modifiers::Redirect;
 use iron::status;
@@ -9,6 +10,15 @@ use super::super::db::GetDb;
 use super::super::store::GetStore;
 use super::super::web::GetRouter;
 use super::util::{self, get_name_and_version};
+
+pub fn get_index(request: &mut Request) -> IronResult<Response> {
+    Ok(Response::with((
+        status::Ok,
+        Template::new("index", hashmap!{
+            "title".to_owned() => "Rust Crates documentation".to_owned(),
+        })
+    )))
+}
 
 pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     let (name, version) = get_name_and_version(request);
