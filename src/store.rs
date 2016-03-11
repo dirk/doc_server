@@ -38,18 +38,23 @@ impl Store {
 
     /// Returns a `Vec` of crate names (directories) in this store.
     pub fn crate_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = vec![];
+        Store::get_dir_entries(self.path.clone())
+    }
 
-        for entry in fs::read_dir(self.path.clone()).unwrap() {
+    fn get_dir_entries<P>(dir: P) -> Vec<String>
+        where P: AsRef<Path> {
+        let mut entries: Vec<String> = vec![];
+
+        for entry in fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
 
             if fs::metadata(&path).unwrap().is_dir() {
                 let file_name = path.file_name().unwrap();
-                names.push(file_name.to_str().unwrap().to_owned())
+                entries.push(file_name.to_str().unwrap().to_owned())
             }
         }
 
-        names
+        entries
     }
 }
 
