@@ -1,5 +1,14 @@
 {{> layout_header }}
 
-Welcome to the public source for Rust Crate documentation.
+<h1 class="home__heading">Welcome to the public source for Rust Crate documentation.</h1>
+
+<h3 class="crate-names__heading">Crates</h3>
+<ul class="crate-names__list">
+  {{#each crate_names}}
+    <li class="crate-names__crate">
+      <a href="/crates/{{this}}">{{this}}</a>
+    </li>
+  {{/each}}
+</ul>
 
 {{> layout_footer }}

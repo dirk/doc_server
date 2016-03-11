@@ -2,6 +2,7 @@ use handlebars_iron::Template;
 use iron::prelude::*;
 use iron::modifiers::Redirect;
 use iron::status;
+use rustc_serialize::json::Json;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
@@ -12,10 +13,14 @@ use super::super::web::GetRouter;
 use super::util::{self, get_name_and_version};
 
 pub fn get_index(request: &mut Request) -> IronResult<Response> {
+    let store = request.get_store();
+    let crate_names = store.crate_names();
+
     Ok(Response::with((
         status::Ok,
         Template::new("index", hashmap!{
-            "title".to_owned() => "Rust Crates documentation".to_owned(),
+            "title".to_owned() => Json::String("Rust Crates documentation".to_owned()),
+            "crate_names".to_owned() => Json::Array(crate_names.into_iter().map(|n| Json::String(n)).collect()),
         })
     )))
 }

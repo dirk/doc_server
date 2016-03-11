@@ -2,12 +2,13 @@ use iron::prelude::Request;
 use iron::typemap;
 use persistent::Read;
 use plugin::Extensible;
+use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
 pub struct Store {
     // Directory where the doc tarballs are stored
-    path: String,
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -33,6 +34,22 @@ impl Store {
 
     pub fn make_crate(&self, name: &str, version: &str) -> StoredCrate {
         StoredCrate(format!("{}/{}/{}", self.path, name, version))
+    }
+
+    /// Returns a `Vec` of crate names (directories) in this store.
+    pub fn crate_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = vec![];
+
+        for entry in fs::read_dir(self.path.clone()).unwrap() {
+            let path = entry.unwrap().path();
+
+            if fs::metadata(&path).unwrap().is_dir() {
+                let file_name = path.file_name().unwrap();
+                names.push(file_name.to_str().unwrap().to_owned())
+            }
+        }
+
+        names
     }
 }
 

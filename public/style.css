@@ -3,7 +3,26 @@
   padding: 0;
 }
 
+body {
+  font: 1.25rem/1.5 Times, serif;
+}
+
 .main {
-  margin: 1rem;
+  margin: 2rem;
+}
+
+.home__heading {
+  margin: 0 0 1.75rem;
   font-size: 1.25rem;
+  font-weight: normal;
+}
+
+.crate-names__heading {
+  font-family: Arial, sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.05rem;
+  text-transform: uppercase;
+}
+.crate-names__list {
+  padding: 0 0 0 2rem;
 }
