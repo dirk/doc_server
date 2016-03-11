@@ -53,6 +53,7 @@ fn main() {
     router.route(Method::Get, "/api/v1/crates/:name/:version/status", api::get_crate_status);
 
     router.route(Method::Get, "/", frontend::get_index);
+    router.route(Method::Get, "/crates/:name", frontend::get_crate_index);
     router.route(Method::Get, "/crates/:name/:version", frontend::get_docs);
     router.route(Method::Get, "/crates/:name/:version/*path", frontend::get_doc_file);
 

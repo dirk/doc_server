@@ -25,6 +25,31 @@ pub fn get_index(request: &mut Request) -> IronResult<Response> {
     )))
 }
 
+pub fn get_crate_index(request: &mut Request) -> IronResult<Response> {
+    let store = request.get_store();
+    let name = request.get_router().find("name").unwrap();
+
+    if let Some(versions) = store.crate_versions(name) {
+        let versions = versions.into_iter().map(|version| {
+            Json::Object(btreemap!{
+                "path".to_owned() =>    Json::String(format!("/crates/{}/{}", name, version)),
+                "version".to_owned() => Json::String(version),
+            })
+        }).collect();
+
+        Ok(Response::with((
+            status::Ok,
+            Template::new("crate_index", hashmap!{
+                "title".to_owned()    => Json::String(format!("{} versions", name)),
+                "name".to_owned()     => Json::String(name.to_owned()),
+                "versions".to_owned() => Json::Array(versions),
+            })
+        )))
+    } else {
+        Ok(Response::with((status::NotFound)))
+    }
+}
+
 pub fn get_docs(request: &mut Request) -> IronResult<Response> {
     let (name, version) = get_name_and_version(request);
     let db = request.get_db().clone();

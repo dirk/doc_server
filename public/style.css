@@ -7,22 +7,40 @@ body {
   font: 1.25rem/1.5 Times, serif;
 }
 
+a {
+  color: blue;
+}
+
 .main {
   margin: 2rem;
 }
 
-.home__heading {
+.home__heading,
+.crate__heading {
   margin: 0 0 1.75rem;
   font-size: 1.25rem;
   font-weight: normal;
 }
 
-.crate-names__heading {
+.crate-names__heading,
+.crate-versions__heading {
   font-family: Arial, sans-serif;
   font-size: 1rem;
   letter-spacing: 0.05rem;
   text-transform: uppercase;
 }
-.crate-names__list {
+.crate-names__list,
+.crate-versions__list {
   padding: 0 0 0 2rem;
+  font-size: 1.125rem;
+}
+
+.breadcrumb {
+  margin: 0 0 2rem;
+  padding: 0 0 0.75rem;
+  border-bottom: 1px solid #ccc;
+  font-family: Arial, sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.05rem;
+  text-transform: uppercase;
 }

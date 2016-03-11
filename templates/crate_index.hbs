@@ -1,0 +1,21 @@
+{{> layout_header }}
+
+<div class="breadcrumb">
+  <a class="breadcrumb__item"
+     href="/">
+    All crates
+  </a>
+</div>
+
+<h1 class="crate__heading">Crate <strong>{{name}}</strong>'s versions</h1>
+
+<h3 class="crate-versions__heading">Versions</h3>
+<ul class="crate-versions__list">
+  {{#each versions}}
+    <li class="crate-names__crate">
+      <a href="{{path}}">{{version}}</a>
+    </li>
+  {{/each}}
+</ul>
+
+{{> layout_footer }}

@@ -3,7 +3,7 @@ use iron::typemap;
 use persistent::Read;
 use plugin::Extensible;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub struct Store {
@@ -39,6 +39,17 @@ impl Store {
     /// Returns a `Vec` of crate names (directories) in this store.
     pub fn crate_names(&self) -> Vec<String> {
         Store::get_dir_entries(self.path.clone())
+    }
+
+    pub fn crate_versions(&self, name: &str) -> Option<Vec<String>> {
+        let mut path = PathBuf::from(self.path.clone());
+        path.push(name);
+
+        if !path.is_dir() {
+            return None
+        }
+
+        Some(Store::get_dir_entries(path))
     }
 
     fn get_dir_entries<P>(dir: P) -> Vec<String>
